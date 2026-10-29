@@ -37,6 +37,15 @@ Go to http://localhost:3000/admin/new-record (or the "Admin" link in the footer)
 
 To add videos to an event without a swim, use **Add videos to an event** (`/admin/event-videos`): pick the event, add any number of links, and optionally a stroke for each so it also shows on that stroke's page. The `/events` page lists every event with its videos.
 
+## Editing events and records (admin)
+
+While signed in, **Edit** links appear on the site:
+
+- `/events` - "Edit event" on each event card, and "Edit" on each swim row
+- stroke pages - an "Edit" column in the records table
+
+They open `/admin/events/{id}` and `/admin/records/{id}`. Visitors who aren't signed in see no links, and those pages redirect them to the sign-in page. Editing a record lets you change the event, stroke, distance, course, time, round, place, date, PB flag and notes. Videos aren't changed there; add more with **Add videos to an event**.
+
 Security: the browser never talks to the write API. Sign-in sets a signed, httpOnly cookie (12 hours); the Next.js server then calls the PHP API with `API_WRITE_KEY`, and the API rejects any POST without it.
 
 ## Upgrading an existing database
@@ -63,6 +72,8 @@ docker compose exec db sh -c 'mysql -uroot -p$MYSQL_ROOT_PASSWORD < /tmp/m.sql'
 | `POST /api/events` | Create an event (needs `X-API-Key`) |
 | `POST /api/records` | Create a record; optional `videos: [{youtubeId, title?}]` (needs `X-API-Key`) |
 | `POST /api/videos` | Add videos to an event: `{eventId, videos: [{youtubeId, title?, strokeSlug?}]}` (needs `X-API-Key`) |
+| `PUT /api/events/{id}` | Replace an event's fields (needs `X-API-Key`); 404 if it doesn't exist |
+| `PUT /api/records/{id}` | Replace a record's swim fields, same body as POST without videos (needs `X-API-Key`); 404 if it doesn't exist |
 
 Validation errors return HTTP 422 with `{"error": "...", "fields": {"field": "message"}}`; video errors use keys like `videos.2.youtubeId`. Code: `api/index.php` (router), `api/lib/handlers.php`, `api/lib/validate.php`, `api/lib/db.php`.
 
@@ -77,4 +88,4 @@ docker compose cp db:/tmp/backup.sql ./backup.sql
 
 ## Not included yet
 
-Editing or deleting records, events and videos (do it in MySQL for now), and multiple admin accounts.
+Deleting records, events and videos, editing or removing a video once added (do these in MySQL for now), and multiple admin accounts.

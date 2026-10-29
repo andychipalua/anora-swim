@@ -23,10 +23,14 @@ export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string; fields?: Record<string, string> };
 
-async function post<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+async function send<T>(
+  method: "POST" | "PUT",
+  path: string,
+  body: unknown
+): Promise<ApiResult<T>> {
   try {
     const res = await fetch(`${BASE}${path}`, {
-      method: "POST",
+      method,
       headers: {
         "Content-Type": "application/json",
         "X-API-Key": process.env.API_WRITE_KEY ?? "",
@@ -45,6 +49,9 @@ async function post<T>(path: string, body: unknown): Promise<ApiResult<T>> {
     return { ok: false, error: "Could not reach the API." };
   }
 }
+
+const post = <T>(path: string, body: unknown) => send<T>("POST", path, body);
+const put = <T>(path: string, body: unknown) => send<T>("PUT", path, body);
 
 export interface NewEventPayload {
   name: string;
@@ -84,3 +91,11 @@ export const createRecord = (p: NewRecordPayload) =>
   post<{ id: number; videoIds: number[] }>("/api/records", p);
 export const createVideos = (p: { eventId: number; videos: NewVideoPayload[] }) =>
   post<{ videoIds: number[] }>("/api/videos", p);
+
+// Updates replace all editable fields. Videos linked to a record are not touched.
+export type UpdateRecordPayload = Omit<NewRecordPayload, "videos">;
+
+export const updateEvent = (id: number, p: NewEventPayload) =>
+  put<EventInfo>(`/api/events/${id}`, p);
+export const updateRecord = (id: number, p: UpdateRecordPayload) =>
+  put<{ id: number }>(`/api/records/${id}`, p);

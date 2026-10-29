@@ -1,4 +1,6 @@
 -- Sample data: replace with Anora's real times (or delete and use the admin page)
+-- Make sure the emoji below are read as UTF-8 and not mangled by the client's default charset
+SET NAMES utf8mb4;
 USE anora_swim;
 
 INSERT INTO strokes (slug, name, emoji, sort_order) VALUES

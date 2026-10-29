@@ -3,6 +3,7 @@ import ProgressChart from "@/components/ProgressChart";
 import RecordsTable from "@/components/RecordsTable";
 import VideoCard from "@/components/VideoCard";
 import { getRecords, getStrokes, getVideos } from "@/lib/api";
+import { isAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,11 @@ export default async function StrokePage({
   const stroke = strokes.find((s) => s.slug === slug);
   if (!stroke) notFound();
 
-  const [items, videos] = await Promise.all([getRecords(slug), getVideos(slug)]);
+  const [items, videos, admin] = await Promise.all([
+    getRecords(slug),
+    getVideos(slug),
+    isAdmin(),
+  ]);
 
   return (
     <>
@@ -34,7 +39,7 @@ export default async function StrokePage({
       )}
 
       <h2>Records</h2>
-      <RecordsTable items={items} videos={videos} />
+      <RecordsTable items={items} videos={videos} editable={admin} />
 
       {videos.length > 0 && (
         <>

@@ -1,12 +1,15 @@
+import Link from "next/link";
 import { formatDate, formatTime } from "@/lib/helpers";
 import type { SwimRecord, SwimVideo } from "@/data/types";
 
 export default function RecordsTable({
   items,
   videos,
+  editable = false,
 }: {
   items: SwimRecord[];
   videos: SwimVideo[];
+  editable?: boolean; // show an Edit link per row (admin only)
 }) {
   if (items.length === 0) {
     return <p className="muted">No records added yet.</p>;
@@ -24,6 +27,7 @@ export default function RecordsTable({
             <th>Date</th>
             <th>Meet</th>
             <th>Video</th>
+            {editable && <th></th>}
           </tr>
         </thead>
         <tbody>
@@ -54,6 +58,11 @@ export default function RecordsTable({
                     "—"
                   )}
                 </td>
+                {editable && (
+                  <td>
+                    <Link href={`/admin/records/${r.id}`}>Edit</Link>
+                  </td>
+                )}
               </tr>
             );
           })}

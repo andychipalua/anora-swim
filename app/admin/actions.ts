@@ -6,6 +6,9 @@ import {
   createEvent,
   createRecord,
   createVideos,
+  updateEvent,
+  updateRecord,
+  type UpdateRecordPayload,
   type NewEventPayload,
   type NewRecordPayload,
   type NewVideoPayload,
@@ -251,6 +254,111 @@ export async function saveRecordAction(_prev: FormState, formData: FormData): Pr
       revalidatePath("/admin/new-record");
     }
     return result;
+  }
+
+  redirect(`/strokes/${encodeURIComponent(strokeSlug)}`);
+}
+
+// ---------- Edit an event ----------
+
+export async function updateEventAction(
+  id: number,
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  if (!(await isAdmin())) redirect("/admin/login");
+
+  const values: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) if (typeof v === "string") values[k] = v;
+
+  const fieldErrors: Record<string, string> = {};
+  if (!text(formData, "event_name")) fieldErrors.event_name = "Required";
+  if (!text(formData, "event_date")) fieldErrors.event_date = "Required";
+  if (Object.keys(fieldErrors).length > 0) {
+    return { error: "Please fix the highlighted fields.", fieldErrors, values };
+  }
+
+  const payload: NewEventPayload = {
+    name: text(formData, "event_name"),
+    date: text(formData, "event_date"),
+    endDate: opt(text(formData, "event_endDate")),
+    venue: opt(text(formData, "event_venue")),
+    address: opt(text(formData, "event_address")),
+    city: opt(text(formData, "event_city")),
+    course: opt(text(formData, "event_course")),
+    level: opt(text(formData, "event_level")),
+    website: opt(text(formData, "event_website")),
+    notes: opt(text(formData, "event_notes")),
+  };
+
+  const res = await updateEvent(id, payload);
+  if (!res.ok) {
+    return {
+      error: res.error === "Validation failed" ? "Please fix the highlighted fields." : res.error,
+      fieldErrors: mapApiFields(res.fields, [], (k) => `event_${k}`),
+      values,
+    };
+  }
+
+  redirect("/events");
+}
+
+// ---------- Edit a record ----------
+
+export async function updateRecordAction(
+  id: number,
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  if (!(await isAdmin())) redirect("/admin/login");
+
+  const values: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) if (typeof v === "string") values[k] = v;
+
+  const fieldErrors: Record<string, string> = {};
+
+  const strokeSlug = text(formData, "stroke");
+  const distance = Number(text(formData, "distance"));
+  const course = text(formData, "course");
+  const eventId = Number(text(formData, "eventId"));
+  if (!strokeSlug) fieldErrors.stroke = "Choose a stroke";
+  if (!Number.isInteger(distance) || distance <= 0) fieldErrors.distance = "Choose a distance";
+  if (!course) fieldErrors.course = "Choose a course";
+  if (!Number.isInteger(eventId) || eventId <= 0) fieldErrors.eventId = "Choose an event";
+
+  const timeSeconds = parseTime(text(formData, "time"));
+  if (timeSeconds === null) fieldErrors.time = "Enter a time like 31.45 or 1:08.20";
+
+  const placeText = text(formData, "place");
+  const place = placeText ? Number(placeText) : undefined;
+  if (place !== undefined && (!Number.isInteger(place) || place < 1 || place > 999)) {
+    fieldErrors.place = "Enter a whole number, e.g. 1";
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return { error: "Please fix the highlighted fields.", fieldErrors, values };
+  }
+
+  const payload: UpdateRecordPayload = {
+    strokeSlug,
+    distance,
+    course,
+    timeSeconds: timeSeconds as number,
+    eventId,
+    date: opt(text(formData, "date")),
+    round: opt(text(formData, "round")),
+    place,
+    isPb: values.isPb === "on",
+    notes: opt(text(formData, "notes")),
+  };
+
+  const res = await updateRecord(id, payload);
+  if (!res.ok) {
+    return {
+      error: res.error === "Validation failed" ? "Please fix the highlighted fields." : res.error,
+      fieldErrors: mapApiFields(res.fields, [], (k) => RECORD_FIELD_MAP[k] ?? k),
+      values,
+    };
   }
 
   redirect(`/strokes/${encodeURIComponent(strokeSlug)}`);

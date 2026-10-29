@@ -7,7 +7,7 @@ require __DIR__ . '/lib/handlers.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-API-Key');
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -22,6 +22,13 @@ $stroke = (isset($_GET['stroke']) && is_string($_GET['stroke']) && $_GET['stroke
     : null;
 
 try {
+    // PUT /api/events/{id} and PUT /api/records/{id}
+    if ($method === 'PUT' && preg_match('#^/api/(events|records)/(\d+)$#', $path, $m)) {
+        require_write_key();
+        $id = (int) $m[2];
+        $m[1] === 'events' ? update_event($id) : update_record($id);
+    }
+
     switch ($method . ' ' . $path) {
         case 'GET /api/health':
             db()->query('SELECT 1');

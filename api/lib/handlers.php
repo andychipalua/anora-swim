@@ -44,7 +44,7 @@ function list_records(?string $stroke): never
             FROM records r
             JOIN events e ON e.id = r.event_id'
         . ($stroke !== null ? ' WHERE r.stroke_slug = ?' : '')
-        . ' ORDER BY r.race_date, r.distance, r.time_seconds';
+        . ' ORDER BY r.race_date DESC, r.distance, r.time_seconds';
     $stmt = db()->prepare($sql);
     $stmt->execute($stroke !== null ? [$stroke] : []);
 
@@ -87,11 +87,13 @@ function list_videos(?string $stroke): never
     ], $stmt->fetchAll()));
 }
 
-function create_event(): never
-{
-    $d = json_body();
-    $e = [];
+// ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
 
+/** Validates the event fields shared by create and update. Errors go into $e. */
+function parse_event(array $d, array &$e): array
+{
     $name    = clean_str($d, 'name', 200, $e, true);
     $date    = clean_date($d, 'date', $e, true);
     $endDate = clean_date($d, 'endDate', $e);
@@ -110,6 +112,24 @@ function create_event(): never
     }
     $notes = clean_str($d, 'notes', 2000, $e);
 
+    return [$name, $date, $endDate, $venue, $address, $city, $course, $level, $website, $notes];
+}
+
+function fetch_event_row(PDO $pdo, int $id): array|false
+{
+    $stmt = $pdo->prepare(
+        'SELECT e.*, (SELECT COUNT(*) FROM records r WHERE r.event_id = e.id) AS record_count
+         FROM events e WHERE e.id = ?'
+    );
+    $stmt->execute([$id]);
+    return $stmt->fetch();
+}
+
+function create_event(): never
+{
+    $d = json_body();
+    $e = [];
+    $fields = parse_event($d, $e);
     if ($e) {
         validation_failed($e);
     }
@@ -118,12 +138,38 @@ function create_event(): never
     $pdo->prepare(
         'INSERT INTO events (name, event_date, end_date, venue, address, city, course, level, website, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    )->execute([$name, $date, $endDate, $venue, $address, $city, $course, $level, $website, $notes]);
+    )->execute($fields);
 
-    $stmt = $pdo->prepare('SELECT * FROM events WHERE id = ?');
-    $stmt->execute([(int) $pdo->lastInsertId()]);
-    send_json(event_row($stmt->fetch()), 201);
+    send_json(event_row(fetch_event_row($pdo, (int) $pdo->lastInsertId())), 201);
 }
+
+/** PUT /api/events/{id}: replaces all editable fields of an event. */
+function update_event(int $id): never
+{
+    $pdo = db();
+    if (fetch_event_row($pdo, $id) === false) {
+        send_json(['error' => 'Event not found'], 404);
+    }
+
+    $d = json_body();
+    $e = [];
+    $fields = parse_event($d, $e);
+    if ($e) {
+        validation_failed($e);
+    }
+
+    $pdo->prepare(
+        'UPDATE events SET name = ?, event_date = ?, end_date = ?, venue = ?, address = ?,
+                           city = ?, course = ?, level = ?, website = ?, notes = ?
+         WHERE id = ?'
+    )->execute([...$fields, $id]);
+
+    send_json(event_row(fetch_event_row($pdo, $id)));
+}
+
+// ---------------------------------------------------------------------------
+// Videos
+// ---------------------------------------------------------------------------
 
 /**
  * Validates the "videos" list in a request body.
@@ -188,99 +234,6 @@ function save_video(PDO $pdo, string $youtubeId, string $title, ?string $strokeS
     return (int) $pdo->lastInsertId();
 }
 
-function create_record(): never
-{
-    $d = json_body();
-    $e = [];
-    $pdo = db();
-
-    // Stroke must exist
-    $strokeSlug = clean_str($d, 'strokeSlug', 30, $e, true);
-    $strokeName = null;
-    if ($strokeSlug !== null) {
-        $s = $pdo->prepare('SELECT name FROM strokes WHERE slug = ?');
-        $s->execute([$strokeSlug]);
-        $strokeName = $s->fetchColumn();
-        if ($strokeName === false) {
-            $e['strokeSlug'] = 'Unknown stroke';
-        }
-    }
-
-    $distance = clean_int($d, 'distance', 25, 1500, $e, true);
-    $course   = clean_enum($d, 'course', COURSES, $e);
-    if ($course === null && !isset($e['course'])) {
-        $e['course'] = 'Required';
-    }
-
-    $time = $d['timeSeconds'] ?? null;
-    if (!is_numeric($time) || (float) $time <= 0 || (float) $time > 7200) {
-        $e['timeSeconds'] = 'Enter a time greater than 0';
-        $time = null;
-    } else {
-        $time = round((float) $time, 2);
-    }
-
-    // Event must exist; the swim date defaults to the event's first day
-    $eventId = clean_int($d, 'eventId', 1, PHP_INT_MAX, $e, true);
-    $eventName = null;
-    $eventDate = null;
-    if ($eventId !== null) {
-        $ev = $pdo->prepare('SELECT name, event_date FROM events WHERE id = ?');
-        $ev->execute([$eventId]);
-        $row = $ev->fetch();
-        if ($row === false) {
-            $e['eventId'] = 'Event not found';
-        } else {
-            $eventName = $row['name'];
-            $eventDate = $row['event_date'];
-        }
-    }
-
-    $date  = clean_date($d, 'date', $e) ?? $eventDate;
-    $round = clean_enum($d, 'round', ROUNDS, $e, 'Heat');
-    $place = clean_int($d, 'place', 1, 999, $e);
-    $isPb  = filter_var($d['isPb'] ?? false, FILTER_VALIDATE_BOOLEAN);
-    $notes = clean_str($d, 'notes', 2000, $e);
-
-    // Any number of videos; they are attached to the event, and the first one to this swim
-    $videos = parse_videos($d, $e);
-
-    if ($e) {
-        validation_failed($e);
-    }
-
-    try {
-        $pdo->beginTransaction();
-
-        $videoIds = [];
-        foreach ($videos as $v) {
-            $title = $v['title'] ?? sprintf('%dm %s - %s', $distance, $strokeName, $eventName);
-            $videoIds[] = save_video($pdo, $v['youtubeId'], $title, $strokeSlug, $eventId, $date);
-        }
-        $primaryVideoId = $videoIds[0] ?? null;
-
-        $pdo->prepare(
-            'INSERT INTO records
-               (stroke_slug, distance, course, time_seconds, race_date, event_id,
-                round, place, is_pb, notes, video_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        )->execute([
-            $strokeSlug, $distance, $course, $time, $date, $eventId,
-            $round, $place, $isPb ? 1 : 0, $notes, $primaryVideoId,
-        ]);
-        $id = (int) $pdo->lastInsertId();
-
-        $pdo->commit();
-    } catch (Throwable $ex) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
-        throw $ex;
-    }
-
-    send_json(['id' => $id, 'videoIds' => $videoIds], 201);
-}
-
 /** Add one or more videos to an event, without needing a swim record. */
 function create_videos(): never
 {
@@ -333,4 +286,149 @@ function create_videos(): never
     }
 
     send_json(['videoIds' => $videoIds], 201);
+}
+
+// ---------------------------------------------------------------------------
+// Records
+// ---------------------------------------------------------------------------
+
+/** Validates the swim fields shared by create and update. Errors go into $e. */
+function parse_record(array $d, array &$e, PDO $pdo): array
+{
+    // Stroke must exist
+    $strokeSlug = clean_str($d, 'strokeSlug', 30, $e, true);
+    $strokeName = null;
+    if ($strokeSlug !== null) {
+        $s = $pdo->prepare('SELECT name FROM strokes WHERE slug = ?');
+        $s->execute([$strokeSlug]);
+        $strokeName = $s->fetchColumn();
+        if ($strokeName === false) {
+            $e['strokeSlug'] = 'Unknown stroke';
+        }
+    }
+
+    $distance = clean_int($d, 'distance', 25, 1500, $e, true);
+    $course   = clean_enum($d, 'course', COURSES, $e);
+    if ($course === null && !isset($e['course'])) {
+        $e['course'] = 'Required';
+    }
+
+    $time = $d['timeSeconds'] ?? null;
+    if (!is_numeric($time) || (float) $time <= 0 || (float) $time > 7200) {
+        $e['timeSeconds'] = 'Enter a time greater than 0';
+        $time = null;
+    } else {
+        $time = round((float) $time, 2);
+    }
+
+    // Event must exist; the swim date defaults to the event's first day
+    $eventId = clean_int($d, 'eventId', 1, PHP_INT_MAX, $e, true);
+    $eventName = null;
+    $eventDate = null;
+    if ($eventId !== null) {
+        $ev = $pdo->prepare('SELECT name, event_date FROM events WHERE id = ?');
+        $ev->execute([$eventId]);
+        $row = $ev->fetch();
+        if ($row === false) {
+            $e['eventId'] = 'Event not found';
+        } else {
+            $eventName = $row['name'];
+            $eventDate = $row['event_date'];
+        }
+    }
+
+    return [
+        'strokeSlug' => $strokeSlug,
+        'strokeName' => $strokeName,
+        'distance'   => $distance,
+        'course'     => $course,
+        'time'       => $time,
+        'eventId'    => $eventId,
+        'eventName'  => $eventName,
+        'date'       => clean_date($d, 'date', $e) ?? $eventDate,
+        'round'      => clean_enum($d, 'round', ROUNDS, $e, 'Heat'),
+        'place'      => clean_int($d, 'place', 1, 999, $e),
+        'isPb'       => filter_var($d['isPb'] ?? false, FILTER_VALIDATE_BOOLEAN),
+        'notes'      => clean_str($d, 'notes', 2000, $e),
+    ];
+}
+
+function create_record(): never
+{
+    $d = json_body();
+    $e = [];
+    $pdo = db();
+
+    $r = parse_record($d, $e, $pdo);
+
+    // Any number of videos; they are attached to the event, and the first one to this swim
+    $videos = parse_videos($d, $e);
+
+    if ($e) {
+        validation_failed($e);
+    }
+
+    try {
+        $pdo->beginTransaction();
+
+        $videoIds = [];
+        foreach ($videos as $v) {
+            $title = $v['title'] ?? sprintf('%dm %s - %s', $r['distance'], $r['strokeName'], $r['eventName']);
+            $videoIds[] = save_video($pdo, $v['youtubeId'], $title, $r['strokeSlug'], $r['eventId'], $r['date']);
+        }
+        $primaryVideoId = $videoIds[0] ?? null;
+
+        $pdo->prepare(
+            'INSERT INTO records
+               (stroke_slug, distance, course, time_seconds, race_date, event_id,
+                round, place, is_pb, notes, video_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $r['strokeSlug'], $r['distance'], $r['course'], $r['time'], $r['date'], $r['eventId'],
+            $r['round'], $r['place'], $r['isPb'] ? 1 : 0, $r['notes'], $primaryVideoId,
+        ]);
+        $id = (int) $pdo->lastInsertId();
+
+        $pdo->commit();
+    } catch (Throwable $ex) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $ex;
+    }
+
+    send_json(['id' => $id, 'videoIds' => $videoIds], 201);
+}
+
+/**
+ * PUT /api/records/{id}: replaces the swim fields of a record.
+ * Linked videos are left alone (manage those with the videos endpoint).
+ */
+function update_record(int $id): never
+{
+    $pdo = db();
+    $exists = $pdo->prepare('SELECT 1 FROM records WHERE id = ?');
+    $exists->execute([$id]);
+    if ($exists->fetchColumn() === false) {
+        send_json(['error' => 'Record not found'], 404);
+    }
+
+    $d = json_body();
+    $e = [];
+    $r = parse_record($d, $e, $pdo);
+    if ($e) {
+        validation_failed($e);
+    }
+
+    $pdo->prepare(
+        'UPDATE records
+         SET stroke_slug = ?, distance = ?, course = ?, time_seconds = ?, race_date = ?, event_id = ?,
+             round = ?, place = ?, is_pb = ?, notes = ?
+         WHERE id = ?'
+    )->execute([
+        $r['strokeSlug'], $r['distance'], $r['course'], $r['time'], $r['date'], $r['eventId'],
+        $r['round'], $r['place'], $r['isPb'] ? 1 : 0, $r['notes'], $id,
+    ]);
+
+    send_json(['id' => $id]);
 }
