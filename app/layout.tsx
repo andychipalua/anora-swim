@@ -22,11 +22,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className={`${bebas.variable} ${barlow.variable}`}>
       <body>
         <header className="sticky top-0 z-50 bg-gradient-to-r from-navy-deep to-pool shadow-md">
-          <div className="container flex h-[60px] items-center justify-between gap-x-6">
+          <div className="container flex flex-col gap-1 py-2 md:h-[60px] md:flex-row md:items-center md:justify-between md:gap-x-6 md:py-0">
             <Link href="/" className="font-display text-3xl uppercase leading-none tracking-wide text-white no-underline hover:no-underline">
               {swimmer.name} Swims
             </Link>
-            <nav className="flex flex-wrap gap-x-7 gap-y-1 text-[0.95rem] font-semibold">
+            <nav className="-mx-4 flex gap-x-6 overflow-x-auto whitespace-nowrap px-4 pb-1 text-[0.95rem] font-semibold [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>a]:shrink-0 md:mx-0 md:gap-x-7 md:overflow-visible md:p-0">
               {strokes.map((s) => (
                 <Link key={s.slug} href={`/strokes/${s.slug}`} className="text-white/90 transition-colors hover:text-white">
                   {s.slug === "im" ? "IM" : s.name}
