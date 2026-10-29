@@ -89,3 +89,14 @@ docker compose cp db:/tmp/backup.sql ./backup.sql
 ## Not included yet
 
 Deleting records, events and videos, editing or removing a video once added (do these in MySQL for now), and multiple admin accounts.
+
+
+# Run the app
+```powershell
+docker compose up -d --build web
+```
+
+# Run the API
+```powershell
+docker compose up -d --build api
+```
