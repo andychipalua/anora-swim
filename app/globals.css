@@ -6,6 +6,7 @@
   --accent: #0a84c6;
   --accent-dark: #075f90;
   --border: #d6e4ee;
+  --gradient-pool: linear-gradient(160deg, oklch(0.32 0.1 250), oklch(0.5 0.14 230));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -35,7 +36,12 @@ a:hover { text-decoration: underline; }
 
 .container { max-width: 1000px; margin: 0 auto; padding: 0 16px; }
 
-.site-header { background: var(--card); border-bottom: 1px solid var(--border); }
+.site-header { 
+  background: var(--gradient-pool);
+  border-bottom: 1px solid var(--border);
+  top: 0;
+  position: sticky;
+}
 .nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; padding-bottom: 12px; }
 .nav nav { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.95rem; }
 .brand { font-weight: 700; font-size: 1.2rem; color: var(--text); }
