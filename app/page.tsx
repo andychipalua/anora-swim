@@ -15,12 +15,12 @@ export default async function HomePage() {
 
   return (
     <>
-      <section className="hero-banner">
-        <img src="/assets/images/hero.jpg" alt="Anora swimming freestyle" width={1600} height={912} />
-        <div className="hero-overlay" />
-        <div className="hero-content">
-          <p className="hero-eyebrow">Age group · Club swimmer</p>
-          <h1>Every second counts</h1>
+      <section className="relative left-1/2 h-screen min-h-[420px] w-screen -translate-x-1/2 overflow-hidden">
+        <img src="/assets/images/hero.jpg" alt="Anora swimming freestyle" width={1600} height={912} className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-navy/80 via-navy/20 to-transparent" />
+        <div className="relative mx-auto flex h-full max-w-[1000px] flex-col justify-end px-4 pb-12">
+          <p className="m-0 mb-2 font-semibold uppercase tracking-widest text-accent">Age group · Club swimmer</p>
+          <h1 className="m-0 text-7xl leading-none text-primary-foreground md:text-9xl">Every second counts</h1>
         </div>
       </section>
       <section className="hero">
