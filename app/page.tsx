@@ -36,12 +36,13 @@ export default async function HomePage() {
 
   return (
     <>
-      <section className="relative left-1/2 h-[420px] w-screen -translate-x-1/2 overflow-hidden md:h-[480px]">
+      <section className="relative left-1/2 h-[420px] w-screen -translate-x-1/2 overflow-hidden md:h-[600px]">
         <img src="/assets/images/hero.jpg" alt="Anora swimming freestyle" width={1600} height={912} className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-navy/80 via-navy/20 to-transparent" />
         <div className="relative mx-auto flex h-full max-w-[1120px] flex-col justify-end px-4 pb-10">
-          <p className="m-0 mb-1 text-sm font-bold uppercase tracking-[0.2em] text-coral">Age group · Club swimmer</p>
-          <h1 className="m-0 font-display text-7xl uppercase leading-[0.9] text-white md:text-[8.5rem]">Every second counts</h1>
+          <p className="m-0 mb-1 text-sm font-bold uppercase tracking-[0.2em] text-coral">(9 - 12) Age group · Club swimmer</p>
+          <h1 className="m-0 font-display text-5xl uppercase leading-[0.9] text-white md:text-[6rem]">Every second counts</h1>
+          <h2 className="m-0 font-display text-3xl uppercase leading-[0.9] text-white md:text-[4rem]">Eat my bubbles.</h2>
         </div>
       </section>
 
