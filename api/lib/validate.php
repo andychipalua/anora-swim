@@ -23,10 +23,8 @@ function validation_failed(array $errors): never
 /** Writes need the shared secret that only the Next.js server knows. */
 function require_write_key(): void
 {
-    //$expected = config('API_WRITE_KEY');
-    $expected = getenv('API_WRITE_KEY');
+    $expected = config('API_WRITE_KEY');
     $given = $_SERVER['HTTP_X_API_KEY'] ?? '';
-    //if ($expected === '' || !hash_equals($expected, (string) $given)) {
     if ($expected === false || $expected === '' || !hash_equals($expected, (string) $given)) {
         send_json(['error' => 'Unauthorized'], 401);
     }
