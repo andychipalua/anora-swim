@@ -1,0 +1,41 @@
+name: Deploy API (api.chipalu.com)
+
+on:
+  push:
+    branches: [main]
+    paths: ["api/**", ".github/workflows/deploy-api.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+
+      - name: PHP syntax check
+        run: |
+          find api -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Upload API over FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./api/
+          server-dir: ${{ secrets.FTP_API_DIR }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            Dockerfile
+            apache.conf
+            anora-config.php

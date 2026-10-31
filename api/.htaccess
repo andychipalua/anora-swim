@@ -1,0 +1,11 @@
+# Send every URL that isn't a real file to index.php (LiteSpeed/Apache on Hostinger)
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]
+
+# Never serve the deploy state file, config or lib sources directly
+<FilesMatch "(^\.ftp-deploy-sync-state\.json$|^anora-config\.php$)">
+    Require all denied
+</FilesMatch>
+RedirectMatch 404 ^/lib/
+Options -Indexes
