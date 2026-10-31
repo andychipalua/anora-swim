@@ -27,14 +27,6 @@ ALTER TABLE records
   ADD COLUMN is_pb      BOOLEAN NOT NULL DEFAULT 0,
   ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
--- One event per distinct meet name already stored on records
-INSERT INTO events (name, event_date, end_date, venue)
-SELECT meet, MIN(race_date), NULLIF(MAX(race_date), MIN(race_date)), MAX(location)
-FROM records
-GROUP BY meet;
-
-UPDATE records r JOIN events e ON e.name = r.meet SET r.event_id = e.id;
-
 ALTER TABLE records
   MODIFY event_id INT NOT NULL,
   ADD CONSTRAINT fk_record_event FOREIGN KEY (event_id) REFERENCES events(id),
